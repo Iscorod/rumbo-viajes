@@ -1,6 +1,8 @@
 # Rumbo
 
-App web para organizar varios viajes. Puedes crear viajes, cambiar entre ellos, añadir vuelos y eventos, calcular el tiempo libre y guardar los cambios en este navegador. También exporta un viaje como JSON.
+App web para organizar varios viajes. Cada viaje sigue un itinerario en cuatro pasos: vuelos, hotel, tiempo libre calculado automáticamente y actividades. Puedes crear viajes, cambiar entre ellos y guardar los cambios en este navegador. También exporta un viaje como JSON.
+
+Los formularios se pueden cerrar con **Cancelar**, la X, la tecla Escape o haciendo clic fuera del cuadro. Los campos de alojamiento se editan en el paso del hotel y no bloquean la edición de las fechas del viaje.
 
 ## Copia de viajes en GitHub
 
