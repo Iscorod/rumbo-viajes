@@ -1,12 +1,12 @@
 # Rumbo
 
-App web para organizar varios viajes. Cada viaje sigue un itinerario en cuatro pasos: vuelos, hotel, tiempo libre calculado automáticamente y actividades. Puedes crear viajes, cambiar entre ellos y guardar los cambios en este navegador. También exporta un viaje como JSON.
+App web para organizar varios viajes. El itinerario es la vista principal y ordena el viaje en cuatro pasos: vuelos, hotel, tiempo libre calculado automáticamente y actividades. Puedes añadir observaciones y adjuntos a vuelos, hoteles y actividades, editar planes, y registrar el número de vuelo y la matrícula del avión. También exporta un viaje como JSON.
 
 Los formularios se pueden cerrar con **Cancelar**, la X, la tecla Escape o haciendo clic fuera del cuadro. Los campos de alojamiento se editan en el paso del hotel y no bloquean la edición de las fechas del viaje.
 
 ## Copia de viajes en GitHub
 
-La app guarda cada viaje como un archivo independiente en `data/trips/<id>.json` usando la API de GitHub Contents. Cada JSON se cifra en el servidor con AES-256-GCM antes de llegar a GitHub, porque el repositorio configurado es público. Al guardar se crea un commit. La opción **Guardar todos** sincroniza todos los viajes del navegador; **Cargar lista** permite recuperarlos en otro dispositivo.
+La app guarda cada viaje como un archivo independiente en `data/trips/<id>.json` usando la API de GitHub Contents. Con la clave configurada en Rumbo, cada cambio se sincroniza automáticamente después de una breve pausa y genera un commit. Los adjuntos se guardan por separado en `data/attachments/`, cifrados antes de llegar al repositorio. Cada adjunto puede ocupar hasta 1 MB y el total por viaje, hasta 1,5 MB. La opción **Guardar todos** sigue disponible y **Cargar lista** permite recuperar los viajes en otro dispositivo.
 
 El token de GitHub solo se usa desde la función de servidor `api/trips.js`. No lo pegues en el navegador ni lo añadas al repositorio.
 
@@ -22,7 +22,7 @@ El token de GitHub solo se usa desde la función de servidor `api/trips.js`. No 
    - `GITHUB_BRANCH`: nombre de la rama, normalmente `main` (opcional).
 
 4. Vuelve a desplegar el proyecto.
-5. En Rumbo, pulsa el icono de sincronización, introduce la `GITHUB_SYNC_KEY` y guarda los viajes. En otro dispositivo, introduce la misma clave y pulsa **Cargar lista**.
+5. En Rumbo, pulsa el icono de sincronización e introduce la misma `GITHUB_SYNC_KEY`. Desde ese momento, los siguientes cambios se guardarán automáticamente. En otro dispositivo, introduce la misma clave y pulsa **Cargar lista**.
 
 La clave adicional protege la función de servidor frente a escrituras de terceros. No es el token de GitHub; puedes generar una aleatoria con un gestor de contraseñas.
 

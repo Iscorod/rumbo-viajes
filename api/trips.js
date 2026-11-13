@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
 const API = 'https://api.github.com';
 const ROOT = 'data/trips';
+const ATTACHMENTS = 'data/attachments';
 
 function response(res, status, body) {
   res.statusCode = status;
@@ -50,6 +51,25 @@ function decryptTrip(envelope, secret) {
   }
 }
 
+function encryptAttachment(bytes, secret) {
+  const salt = crypto.randomBytes(16), iv = crypto.randomBytes(12);
+  const key = crypto.scryptSync(secret, salt, 32);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const data = Buffer.concat([cipher.update(bytes), cipher.final()]);
+  return { version: 1, encrypted: 'AES-256-GCM', salt: salt.toString('base64'), iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: data.toString('base64') };
+}
+
+function decryptAttachment(envelope, secret) {
+  try {
+    const key = crypto.scryptSync(secret, Buffer.from(envelope.salt, 'base64'), 32);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(envelope.iv, 'base64'));
+    decipher.setAuthTag(Buffer.from(envelope.tag, 'base64'));
+    return Buffer.concat([decipher.update(Buffer.from(envelope.data, 'base64')), decipher.final()]);
+  } catch {
+    throw Object.assign(new Error('No se pudo descifrar el adjunto. Comprueba GITHUB_SYNC_KEY.'), { status: 401 });
+  }
+}
+
 async function github(path, options, cfg) {
   const result = await fetch(`${API}${path}`, {
     ...options,
@@ -68,23 +88,65 @@ async function github(path, options, cfg) {
   return body;
 }
 
+async function readGitHubJson(path, cfg) {
+  const file = await github(`${path}?ref=${encodeURIComponent(cfg.branch)}`, {}, cfg);
+  if (file.content && file.encoding === 'base64') return JSON.parse(Buffer.from(file.content, 'base64').toString('utf8'));
+  const raw = await fetch(file.download_url, { headers: { Authorization: `Bearer ${cfg.token}`, Accept: 'application/vnd.github.raw+json' } });
+  if (!raw.ok) throw Object.assign(new Error('No se pudo leer el archivo adjunto desde GitHub.'), { status: 502 });
+  return JSON.parse(await raw.text());
+}
+
+function validAttachmentPath(tripId, attachmentId) {
+  return validId(tripId) && validId(attachmentId);
+}
+
 function validId(id) {
   return typeof id === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(id);
 }
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
-    res.setHeader('Allow', 'GET, PUT, DELETE, OPTIONS');
-    return response(res, 204, {});
+    res.setHeader('Allow', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.statusCode = 204;
+    res.end();
+    return;
   }
-  if (!['GET', 'PUT', 'DELETE'].includes(req.method)) {
-    res.setHeader('Allow', 'GET, PUT, DELETE, OPTIONS');
+  if (!['GET', 'POST', 'PUT', 'DELETE'].includes(req.method)) {
+    res.setHeader('Allow', 'GET, POST, PUT, DELETE, OPTIONS');
     return response(res, 405, { error: 'Método no permitido.' });
   }
 
   try {
     const cfg = config(req);
     const basePath = `/repos/${cfg.repo}/contents/${ROOT}`;
+    const attachmentId = req.query && req.query.attachmentId;
+    const tripId = req.query && req.query.tripId;
+    if (req.method === 'GET' && attachmentId) {
+      if (!validAttachmentPath(tripId, attachmentId)) return response(res, 400, { error: 'El adjunto solicitado no es válido.' });
+      const path = `/repos/${cfg.repo}/contents/${ATTACHMENTS}/${tripId}/${attachmentId}.json`;
+      const envelope = await readGitHubJson(path, cfg);
+      const bytes = decryptAttachment(envelope, cfg.syncKey);
+      return response(res, 200, { data: bytes.toString('base64') });
+    }
+    if (req.method === 'POST') {
+      const attachment = req.body && req.body.attachment;
+      if (!attachment || !validAttachmentPath(attachment.tripId, attachment.id) || typeof attachment.data !== 'string') return response(res, 400, { error: 'El adjunto no es válido.' });
+      const bytes = Buffer.from(attachment.data, 'base64');
+      if (!bytes.length || bytes.length > 1024 * 1024) return response(res, 413, { error: 'Cada adjunto puede ocupar como máximo 1 MB.' });
+      const path = `/repos/${cfg.repo}/contents/${ATTACHMENTS}/${attachment.tripId}/${attachment.id}.json`;
+      let sha;
+      try { sha = (await github(`${path}?ref=${encodeURIComponent(cfg.branch)}`, {}, cfg)).sha; } catch (error) { if (error.status !== 404) throw error; }
+      const content = Buffer.from(JSON.stringify(encryptAttachment(bytes, cfg.syncKey)), 'utf8').toString('base64');
+      await github(path, { method: 'PUT', body: JSON.stringify({ message: `Añade adjunto de viaje ${attachment.tripId}`, content, branch: cfg.branch, ...(sha ? { sha } : {}) }) }, cfg);
+      return response(res, 200, { attachment: { id: attachment.id, name: String(attachment.name || 'adjunto').slice(0, 160), type: String(attachment.type || 'application/octet-stream').slice(0, 100), size: bytes.length } });
+    }
+    if (req.method === 'DELETE' && attachmentId) {
+      if (!validAttachmentPath(tripId, attachmentId)) return response(res, 400, { error: 'El adjunto solicitado no es válido.' });
+      const path = `/repos/${cfg.repo}/contents/${ATTACHMENTS}/${tripId}/${attachmentId}.json`;
+      const current = await github(`${path}?ref=${encodeURIComponent(cfg.branch)}`, {}, cfg);
+      await github(path, { method: 'DELETE', body: JSON.stringify({ message: `Borra adjunto de viaje ${tripId}`, sha: current.sha, branch: cfg.branch }) }, cfg);
+      return response(res, 200, { deleted: attachmentId });
+    }
     if (req.method === 'GET') {
       let files;
       try {
