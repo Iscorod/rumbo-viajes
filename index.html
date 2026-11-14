@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#f6f6f2" />
-  <meta name="description" content="Organiza tu viaje y aprovecha cada hora." />
+  <meta name="theme-color" content="#f4f5f2" />
+  <meta name="description" content="Organiza tu viaje, consulta el itinerario y disfruta de tu tiempo libre." />
   <link rel="manifest" href="manifest.webmanifest" />
   <title>Rumbo — tu viaje, a tu ritmo</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -15,41 +15,132 @@
 <body>
   <div class="app-shell">
     <aside class="sidebar">
-      <a class="brand" href="#"><span class="brand-mark">r.</span><span>rumbo<span class="brand-period">.</span></span></a>
-      <div class="nav-label">ESPACIO PERSONAL</div>
-      <button class="nav-item active" data-nav="overview"><span class="nav-icon">◫</span> Vista general</button>
-      <button class="nav-item" data-nav="calendar"><span class="nav-icon">▦</span> Calendario</button>
-      <button class="nav-item" data-nav="hotels"><span class="nav-icon">⌂</span> Alojamientos</button>
-      <div class="side-divider"></div>
-      <div class="nav-label trips-label">TUS VIAJES <button id="addTripMini" title="Crear viaje">+</button></div>
+      <a class="brand" href="#" aria-label="Rumbo, inicio"><span class="brand-mark">r.</span><span>rumbo<span class="brand-period">.</span></span></a>
+      <div class="sidebar-section-title">MIS VIAJES <button class="tiny-add" id="addTripMini" title="Crear viaje" aria-label="Crear viaje">＋</button></div>
       <div id="tripList" class="trip-list"></div>
-      <div class="sidebar-bottom"><div class="help-icon">?</div><div><strong>Tu viaje, bajo control</strong><span>Todo en un mismo lugar.</span></div><button class="more-btn">···</button></div>
+      <div class="side-divider"></div>
+      <div class="sidebar-section-title">ITINERARIO</div>
+      <nav class="main-nav" aria-label="Secciones del viaje">
+        <button class="nav-item active" data-view="itinerary"><span class="nav-icon">◷</span><span>Itinerario</span></button>
+        <button class="nav-item" data-view="flights"><span class="nav-icon">✈</span><span>Vuelos</span></button>
+        <button class="nav-item" data-view="hotels"><span class="nav-icon">⌂</span><span>Hoteles</span></button>
+        <button class="nav-item" data-view="activities"><span class="nav-icon">✳</span><span>Actividades</span></button>
+        <button class="nav-item" data-view="summary"><span class="nav-icon">▦</span><span>Resumen</span></button>
+      </nav>
+      <div class="sidebar-bottom"><span class="help-icon">?</span><div><strong>Todo tu viaje</strong><span>En un solo lugar</span></div></div>
     </aside>
+
     <main class="main-content">
-      <header class="topbar"><div class="breadcrumb"><span>Mis viajes</span><span class="crumb-sep">/</span><strong id="breadcrumbName">Escapada a Lisboa</strong></div><div class="topbar-actions"><span class="saved-status"><i></i> Guardado en este dispositivo</span><button class="icon-button" id="githubBtn" title="Sincronizar con GitHub">↕</button><button class="icon-button" id="exportBtn" title="Exportar viaje">↥</button><button class="avatar">FR</button></div></header>
-      <section class="page-wrap">
-        <div class="hero-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> TU PRÓXIMA AVENTURA</div><h1 id="tripTitle">Escapada a Lisboa<span class="title-dot">.</span></h1><div class="trip-meta"><span>⌖ <span id="tripLocation">Portugal</span></span><span class="meta-dot">·</span><span id="tripDates">12 — 16 jun, 2027</span><span class="meta-dot">·</span><span id="tripDuration">5 días</span></div></div><button class="button button-outline" id="editTripBtn"><span>✎</span> Editar viaje</button></div>
-        
-        <div class="section-heading itinerary-heading"><div><div class="eyebrow small-eyebrow">PRIMERO LO IMPORTANTE, LUEGO A DISFRUTAR</div><h2>Tu itinerario<span class="title-dot">.</span></h2></div></div>
-        <nav class="flow-nav" aria-label="Pasos del itinerario">
-          <button class="flow-tab active" data-step="flights"><span>01</span> Vuelos <i id="flightStepState">Pendiente</i></button>
-          <button class="flow-tab" data-step="hotel"><span>02</span> Hotel <i id="hotelStepState">Pendiente</i></button>
-          <button class="flow-tab" data-step="free"><span>03</span> Tiempo libre <i>Automático</i></button>
-          <button class="flow-tab" data-step="activities"><span>04</span> Actividades <i id="activityStepState">Opcional</i></button>
+      <header class="topbar">
+        <div class="breadcrumb"><span>Mis viajes</span><span class="crumb-sep">/</span><strong id="breadcrumbName">Escapada a Lisboa</strong></div>
+        <div class="topbar-actions">
+          <span class="saved-status" id="savedStatus" role="status"><i></i> Guardado en este dispositivo</span>
+          <button class="icon-button" id="githubBtn" title="Sincronizar con GitHub" aria-label="Sincronizar con GitHub">↕</button>
+          <button class="icon-button" id="exportBtn" title="Exportar viaje a JSON" aria-label="Exportar viaje a JSON">↥</button>
+        </div>
+      </header>
+
+      <div class="page-wrap">
+        <header class="trip-header">
+          <div class="trip-heading">
+            <div class="eyebrow"><span class="eyebrow-line"></span> TU PRÓXIMA AVENTURA</div>
+            <h1 id="tripTitle">Escapada a Lisboa<span class="title-dot">.</span></h1>
+            <div class="trip-meta">
+              <span>⌖ <span id="tripLocation">Portugal</span></span><span class="meta-dot">·</span>
+              <span id="tripDates">12 — 16 jun, 2027</span><span class="meta-dot">·</span>
+              <span id="tripDuration">5 días</span><span class="meta-dot">·</span>
+              <span id="travelerCount">2 viajeros</span>
+            </div>
+          </div>
+          <div class="header-buttons"><button class="button button-outline" id="editTripBtn"><span>✎</span> Editar viaje</button><button class="button button-dark" id="addPrimaryBtn">＋ Añadir al itinerario</button></div>
+        </header>
+
+        <nav class="view-tabs" aria-label="Pestañas del viaje">
+          <button class="view-tab active" data-view="itinerary">Itinerario</button>
+          <button class="view-tab" data-view="flights">Vuelos</button>
+          <button class="view-tab" data-view="hotels">Hoteles</button>
+          <button class="view-tab" data-view="activities">Actividades</button>
+          <button class="view-tab" data-view="summary">Resumen</button>
         </nav>
-        <section class="flow-panel active" data-panel="flights"><div class="panel-card"><div class="panel-heading"><div><div class="eyebrow small-eyebrow">PASO 1 · TRANSPORTE</div><h3>¿Cómo llegas?</h3><p>Añade la ida y la vuelta. Rumbo reservará el tiempo para llegar al aeropuerto y trasladarte.</p></div><button class="button button-dark" id="addFlightBtn">＋ Añadir vuelo</button></div><div id="flightList" class="flight-list"></div><div class="empty-step" id="flightEmpty">Aún no hay vuelos. Puedes añadirlos ahora o pasar al siguiente paso.</div><div class="panel-bottom"><button class="button button-soft step-continue" data-next="hotel">Continuar con el hotel <span>→</span></button><button class="button button-text" data-next="hotel">Lo haré después</button></div></div></section>
-        <section class="flow-panel" data-panel="hotel"><div class="panel-card"><div class="panel-heading"><div><div class="eyebrow small-eyebrow">PASO 2 · ALOJAMIENTO</div><h3>¿Dónde te alojas?</h3><p>Añade el nombre del hotel y los horarios. El traslado se tendrá en cuenta en el itinerario.</p></div><button class="button button-dark" id="addHotelBtn">＋ Añadir hotel</button></div><div id="hotelSummary" class="hotel-summary"></div><div class="empty-step" id="hotelEmpty">Todavía no has añadido alojamiento. Puedes continuar sin hotel.</div><div class="panel-bottom"><button class="button button-soft step-continue" data-next="free">Ver mi tiempo libre <span>→</span></button><button class="button button-text" data-next="free">Lo haré después</button></div></div></section>
-        <section class="flow-panel" data-panel="free"><div class="dashboard-grid"><section class="calendar-card"><div class="calendar-head"><div><div class="eyebrow small-eyebrow">PASO 3 · HUECOS PARA DISFRUTAR</div><strong id="calendarTitle">Junio 2027</strong><span class="calendar-sub">Selecciona un día para ver su detalle</span></div><div class="calendar-arrows"><button class="icon-button" id="prevDays" aria-label="Días anteriores">‹</button><button class="icon-button" id="nextDays" aria-label="Días siguientes">›</button></div></div><div class="week-label" id="weekLabel"></div><div class="week-grid" id="weekGrid"></div><div class="calendar-legend"><span><i class="legend-flight"></i> Vuelo</span><span><i class="legend-transfer"></i> Traslado</span><span><i class="legend-stay"></i> Estancia</span><span><i class="legend-free"></i> Tiempo libre</span></div><div class="calendar-note"><span class="sparkle">✳</span><span><strong>El tiempo libre se calcula solo.</strong> Se descuentan vuelos, antelación y traslados.</span></div></section>
-          <aside class="day-card"><div class="day-card-top"><div><span class="eyebrow small-eyebrow">TU DÍA EN UN VISTAZO</span><h3 id="selectedDayTitle">Selecciona un día</h3></div></div><div class="day-summary"><span class="day-free-icon">✳</span><div><strong id="dayFreeHours">—</strong><span>de tiempo para ti</span></div><div class="day-ring"><svg viewBox="0 0 44 44"><circle class="ring-bg" cx="22" cy="22" r="18"></circle><circle class="ring-value" id="ringValue" cx="22" cy="22" r="18"></circle></svg><b id="ringPercent">—</b></div></div><div class="timeline" id="dayTimeline"></div><button class="button button-soft full-button" data-next="activities">Planear actividades <span>→</span></button></aside></div></section>
-        <section class="flow-panel" data-panel="activities"><div class="panel-card"><div class="panel-heading"><div><div class="eyebrow small-eyebrow">PASO 4 · LO QUE TE APETECE HACER</div><h3>Actividades y planes</h3><p>Añade visitas, comidas o cualquier plan. Aparecerán junto al tiempo libre de cada día.</p></div><button class="button button-dark" id="addEventBtn">＋ Añadir actividad</button></div><div id="activitiesList" class="activities-list"></div><div class="empty-step" id="activitiesEmpty">Todavía no hay actividades. Puedes dejar huecos libres para improvisar.</div><button class="button button-text" data-next="flights">← Volver al inicio del itinerario</button></div></section>
-        <div class="summary-after-itinerary"><div class="stats-grid"><article class="stat-card stat-days"><div class="stat-top"><span class="stat-label">DURACIÓN</span><span class="stat-icon lavender">◷</span></div><div class="stat-value"><span id="daysStat">5</span><small>días</small></div><div class="stat-foot">Un buen rato para perderse <span>↗</span></div></article><article class="stat-card"><div class="stat-top"><span class="stat-label">TIEMPO LIBRE</span><span class="stat-icon mint">✳</span></div><div class="stat-value"><span id="freeStat">31</span><small>h</small><span class="stat-sub" id="freeMinutes">20 min</span></div><div class="stat-foot">Para disfrutar sin mirar el reloj</div></article><article class="stat-card"><div class="stat-top"><span class="stat-label">VUELOS</span><span class="stat-icon peach">↗</span></div><div class="stat-value"><span id="flightsStat">2</span><small>trayectos</small></div><div class="stat-foot" id="nextFlight">Próximo · sáb, 12 jun</div></article><article class="stat-card"><div class="stat-top"><span class="stat-label">ALOJAMIENTOS</span><span class="stat-icon blue">⌂</span></div><div class="stat-value"><span id="hotelsStat">1</span><small>reserva</small></div><div class="stat-foot" id="hotelStatName">Casa do Mercado</div></article></div></div>
+
+        <section class="view active" id="view-itinerary" data-view-panel="itinerary">
+          <div class="section-heading">
+            <div><div class="eyebrow small-eyebrow">VISTA DÍA A DÍA</div><h2>Tu itinerario<span class="title-dot">.</span></h2></div>
+            <div class="day-controls"><button class="icon-button" id="previousDay" aria-label="Día anterior">‹</button><span id="dayCounter">Día 1 de 5</span><button class="icon-button" id="nextDay" aria-label="Día siguiente">›</button></div>
+          </div>
+          <div class="itinerary-grid">
+            <aside class="day-picker card">
+              <div class="card-heading"><div><span class="eyebrow small-eyebrow">TU VIAJE</span><h3>Todos los días</h3></div><span class="count-pill" id="dayCountPill">5 días</span></div>
+              <div id="dayList" class="day-list"></div>
+              <div class="useful-hours"><div class="useful-icon">◷</div><div><strong>Horario útil</strong><span id="usefulHoursLabel">08:00 — 22:00</span></div><button class="icon-button small-icon" id="editUsefulHours" aria-label="Editar horario útil">✎</button></div>
+            </aside>
+
+            <section class="timeline-card card">
+              <div class="timeline-header">
+                <div><span class="eyebrow small-eyebrow" id="selectedDayEyebrow">SÁBADO · 12 JUNIO</span><h3 id="selectedDayTitle">Un día para disfrutar</h3><p id="selectedDaySub">Tu agenda, traslados y ratos para ti en orden.</p></div>
+                <div class="free-total"><span>TIEMPO LIBRE</span><strong id="selectedFreeTime">—</strong><small id="selectedFreePercent"></small></div>
+              </div>
+              <div id="dayWarnings" class="day-warnings" hidden></div>
+              <div class="timeline-track">
+                <div class="timeline-hours" id="timelineHours"></div>
+                <div id="dayTimeline" class="timeline-items"></div>
+              </div>
+              <div id="timelineEmpty" class="empty-state" hidden><div class="empty-illustration">✳</div><strong>Un día con espacio para improvisar</strong><span>Añade vuelos o actividades y aparecerán aquí. El tiempo libre se calcula solo.</span><button class="button button-soft" data-open-add="event">＋ Añadir una actividad</button></div>
+              <div class="timeline-legend"><span><i class="legend-flight"></i> Vuelos y traslados</span><span><i class="legend-hotel"></i> Alojamiento</span><span><i class="legend-activity"></i> Actividades</span><span><i class="legend-free"></i> Tiempo libre</span></div>
+            </section>
+
+            <aside class="day-info">
+              <article class="info-card card">
+                <div class="card-heading"><div><span class="eyebrow small-eyebrow">TRANSPORTE</span><h3>Vuelos del día</h3></div><button class="text-link" data-go-view="flights">Ver todos →</button></div>
+                <div id="dayFlights" class="compact-list"></div><div class="compact-empty" id="dayFlightsEmpty">Sin vuelos este día.</div>
+              </article>
+              <article class="info-card card">
+                <div class="card-heading"><div><span class="eyebrow small-eyebrow">DÓNDE DORMIR</span><h3>Alojamiento</h3></div><button class="text-link" data-go-view="hotels">Ver todos →</button></div>
+                <div id="dayHotels" class="compact-list"></div><div class="compact-empty" id="dayHotelsEmpty">Sin alojamiento asignado.</div>
+              </article>
+              <article class="info-card card">
+                <div class="card-heading"><div><span class="eyebrow small-eyebrow">PLANES</span><h3>Actividades</h3></div><button class="text-link" data-go-view="activities">Ver todos →</button></div>
+                <div id="dayActivities" class="compact-list"></div><div class="compact-empty" id="dayActivitiesEmpty">Este día sigue libre.</div>
+                <button class="button button-soft add-activity-button" data-open-add="event">＋ Añadir actividad</button>
+              </article>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view" id="view-flights" data-view-panel="flights">
+          <div class="section-heading"><div><div class="eyebrow small-eyebrow">TODOS LOS TRAYECTOS</div><h2>Vuelos<span class="title-dot">.</span></h2><p class="section-copy">Añade cada tramo. Rumbo calcula la salida al aeropuerto, la espera y el tiempo de vuelo.</p></div><button class="button button-dark" data-open-add="flight">＋ Añadir vuelo</button></div>
+          <div id="flightList" class="entity-list"></div><div id="flightListEmpty" class="empty-state" hidden><div class="empty-illustration">✈</div><strong>Aún no hay vuelos</strong><span>Añade los tramos de ida, conexión y vuelta.</span><button class="button button-dark" data-open-add="flight">＋ Añadir vuelo</button></div>
+        </section>
+
+        <section class="view" id="view-hotels" data-view-panel="hotels">
+          <div class="section-heading"><div><div class="eyebrow small-eyebrow">ALOJAMIENTO DURANTE EL VIAJE</div><h2>Hoteles<span class="title-dot">.</span></h2><p class="section-copy">Puedes añadir varios alojamientos; cada día mostrará el que corresponda a sus fechas.</p></div><button class="button button-dark" data-open-add="hotel">＋ Añadir hotel</button></div>
+          <div id="hotelList" class="entity-list"></div><div id="hotelListEmpty" class="empty-state" hidden><div class="empty-illustration">⌂</div><strong>Aún no has añadido alojamiento</strong><span>Los días sin hotel seguirán mostrando el tiempo disponible.</span><button class="button button-dark" data-open-add="hotel">＋ Añadir hotel</button></div>
+        </section>
+
+        <section class="view" id="view-activities" data-view-panel="activities">
+          <div class="section-heading"><div><div class="eyebrow small-eyebrow">RESERVAS, VISITAS Y PLANES</div><h2>Actividades<span class="title-dot">.</span></h2><p class="section-copy">Ordenadas por día y hora. Si hay un solapamiento, Rumbo te lo señala.</p></div><button class="button button-dark" data-open-add="event">＋ Añadir actividad</button></div>
+          <div id="activitiesList" class="entity-list"></div><div id="activitiesListEmpty" class="empty-state" hidden><div class="empty-illustration">✳</div><strong>Tu agenda aún está abierta</strong><span>Añade actividades o deja espacio para descubrir el destino.</span><button class="button button-dark" data-open-add="event">＋ Añadir actividad</button></div>
+        </section>
+
+        <section class="view" id="view-summary" data-view-panel="summary">
+          <div class="section-heading"><div><div class="eyebrow small-eyebrow">UN VISTAZO A LA ESCAPADA</div><h2>Resumen<span class="title-dot">.</span></h2></div></div>
+          <div class="stats-grid">
+            <article class="stat-card"><span class="stat-label">DURACIÓN</span><strong id="daysStat">5 días</strong><span class="stat-note">Un buen rato para perderse.</span></article>
+            <article class="stat-card"><span class="stat-label">TIEMPO LIBRE</span><strong id="freeStat">—</strong><span class="stat-note">Dentro de tu horario útil.</span></article>
+            <article class="stat-card"><span class="stat-label">VUELOS</span><strong id="flightsStat">0</strong><span class="stat-note">Tramos guardados.</span></article>
+            <article class="stat-card"><span class="stat-label">ALOJAMIENTOS</span><strong id="hotelsStat">0</strong><span class="stat-note">Reservas durante el viaje.</span></article>
+          </div>
+          <div class="summary-columns"><article class="card summary-card"><div class="card-heading"><div><span class="eyebrow small-eyebrow">VUELO MÁS PRÓXIMO</span><h3 id="nextFlightTitle">Sin vuelos</h3></div><span class="summary-symbol flight-symbol">✈</span></div><p id="nextFlightDetail">Añade tus trayectos al itinerario.</p><button class="text-link" data-go-view="flights">Gestionar vuelos →</button></article><article class="card summary-card"><div class="card-heading"><div><span class="eyebrow small-eyebrow">PRÓXIMO ALOJAMIENTO</span><h3 id="nextHotelTitle">Sin alojamientos</h3></div><span class="summary-symbol hotel-symbol">⌂</span></div><p id="nextHotelDetail">Añade tus reservas para verlas en cada día.</p><button class="text-link" data-go-view="hotels">Gestionar hoteles →</button></article></div>
+        </section>
+
         <footer class="page-footer"><span>Hecho para viajar más ligero <span class="footer-heart">♥</span></span><span>RUMBO · PLANEA MENOS, DISFRUTA MÁS</span></footer>
-      </section>
+      </div>
     </main>
   </div>
-  <div class="toast" id="toast"></div>
-  <dialog id="editorDialog"><form method="dialog" id="editorForm" novalidate><div class="modal-head"><div><div class="eyebrow small-eyebrow" id="modalEyebrow">TU VIAJE</div><h2 id="modalTitle">Editar viaje<span class="title-dot">.</span></h2></div><button class="icon-button close-modal" value="cancel">×</button></div><div class="form-grid" id="formFields"></div><div class="modal-actions"><button class="button button-text" value="cancel">Cancelar</button><button class="button button-dark" id="saveModal" value="default">Guardar cambios</button></div></form></dialog>
-  <dialog id="githubDialog"><div class="sync-modal"><div class="modal-head"><div><div class="eyebrow small-eyebrow">COPIA SEGURA EN TU REPOSITORIO</div><h2>Sincronizar viajes<span class="title-dot">.</span></h2></div><button class="icon-button close-modal" id="closeGithub" aria-label="Cerrar">×</button></div><p class="sync-copy">Los viajes y adjuntos se cifran antes de guardarse en GitHub. Configura aquí la misma <code>GITHUB_SYNC_KEY</code> de Vercel y pulsa «Guardar este» una vez. Después, cada cambio se sincroniza automáticamente. El token de GitHub solo vive en Vercel.</p><div class="field"><label for="syncKey">Clave de sincronización</label><input id="syncKey" type="password" autocomplete="off" placeholder="La que configures como GITHUB_SYNC_KEY"><span class="field-hint">Se recuerda en este navegador. Guárdala en un gestor de contraseñas. Nunca escribas aquí tu GITHUB_TOKEN.</span></div><div class="sync-actions"><button class="button button-outline" id="loadGithubTrips">Cargar lista</button><button class="button button-outline" id="saveAllGithubTrips">Guardar todos</button><button class="button button-dark" id="saveGithubTrip">Guardar este</button></div><div id="remoteTrips" class="remote-trips"></div><p id="syncStatus" class="sync-status" role="status"></p></div></dialog>
+
+  <dialog id="editorDialog"><form id="editorForm" novalidate><div class="modal-head"><div><div class="eyebrow small-eyebrow" id="modalEyebrow">TU VIAJE</div><h2 id="modalTitle">Editar</h2></div><button class="icon-button close-modal" type="button" data-close-editor aria-label="Cerrar">×</button></div><div class="form-grid" id="formFields"></div><div class="modal-actions"><button class="button button-text" type="button" data-close-editor>Cancelar</button><button class="button button-dark" id="saveModal" type="submit">Guardar cambios</button></div></form></dialog>
+  <dialog id="githubDialog"><div class="sync-modal"><div class="modal-head"><div><div class="eyebrow small-eyebrow">COPIA SEGURA EN TU REPOSITORIO</div><h2>Sincronizar viajes</h2></div><button class="icon-button close-modal" id="closeGithub" aria-label="Cerrar">×</button></div><p class="sync-copy">Los viajes y adjuntos se cifran antes de guardarse en GitHub. Usa la misma <code>GITHUB_SYNC_KEY</code> de Vercel. Pulsa «Guardar este» la primera vez; los cambios posteriores se guardarán automáticamente.</p><div class="field"><label for="syncKey">Clave de sincronización</label><input id="syncKey" type="password" autocomplete="off" placeholder="La que configures como GITHUB_SYNC_KEY"><span class="field-hint">Se recuerda en este navegador. Nunca escribas aquí tu GITHUB_TOKEN.</span></div><div class="sync-actions"><button class="button button-outline" id="loadGithubTrips">Cargar lista</button><button class="button button-outline" id="saveAllGithubTrips">Guardar todos</button><button class="button button-dark" id="saveGithubTrip">Guardar este</button></div><div id="remoteTrips" class="remote-trips"></div><p id="syncStatus" class="sync-status" role="status"></p></div></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="app.js"></script>
 </body>
 </html>

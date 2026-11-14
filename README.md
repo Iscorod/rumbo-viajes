@@ -1,39 +1,57 @@
 # Rumbo
 
-App web para organizar varios viajes. El itinerario es la vista principal y ordena el viaje en cuatro pasos: vuelos, hotel, tiempo libre calculado automáticamente y actividades. Puedes añadir observaciones y adjuntos a vuelos, hoteles y actividades, editar planes, y registrar el número de vuelo y la matrícula del avión. También exporta un viaje como JSON.
+Rumbo organiza viajes en una aplicación web estática, sin framework ni base de datos externa. La vista principal es un itinerario de tres columnas: selector de días, cronología y resumen del día. En móvil, el selector y las tarjetas se adaptan a una sola columna.
 
-Los formularios se pueden cerrar con **Cancelar**, la X, la tecla Escape o haciendo clic fuera del cuadro. Los campos de alojamiento se editan en el paso del hotel y no bloquean la edición de las fechas del viaje.
+## Funciones
 
-## Copia de viajes en GitHub
+- Crear, cambiar, editar y borrar varios viajes.
+- Conservar la información antigua guardada en rumbo-trips-v1 y migrar viajes del formato anterior al leerlos.
+- Ver los días del viaje generados entre las fechas de inicio y fin.
+- Guardar el número de viajeros, destino, zona horaria del destino y horario útil.
+- Añadir varios vuelos, incluidas conexiones, con origen, destino, número de vuelo, matrícula del avión, fecha y hora de cada aeropuerto y zona horaria IANA.
+- Indicar la antelación al aeropuerto en horas o minutos y los traslados por vuelo.
+- Añadir varios hoteles con ubicación, fechas y horas de entrada/salida, duración de los trámites y traslados por sentido.
+- Añadir, editar y borrar actividades con horario, ubicación, categoría y descripción.
+- Señalar actividades que se solapan.
+- Calcular el tiempo libre dentro del horario útil, sin contar automáticamente la madrugada ni duplicar bloques ocupados que se superponen.
+- Adjuntar entradas y otros archivos a vuelos, hoteles y actividades.
+- Conservar los datos en el navegador, exportar un viaje a JSON y sincronizar los cambios con GitHub.
 
-La app guarda cada viaje como un archivo independiente en `data/trips/<id>.json` usando la API de GitHub Contents. Con la clave configurada en Rumbo, cada cambio se sincroniza automáticamente después de una breve pausa y genera un commit. Los adjuntos se guardan por separado en `data/attachments/`, cifrados antes de llegar al repositorio. Cada adjunto puede ocupar hasta 1 MB y el total por viaje, hasta 1,5 MB. La opción **Guardar todos** sigue disponible y **Cargar lista** permite recuperar los viajes en otro dispositivo.
+Los cambios de las fechas de viaje generan el nuevo selector de días sin borrar los vuelos, hoteles o actividades que queden fuera del rango. Esos datos se conservan y se pueden editar desde sus secciones.
 
-El token de GitHub solo se usa desde la función de servidor `api/trips.js`. No lo pegues en el navegador ni lo añadas al repositorio.
+## Almacenamiento y sincronización
 
-### Preparar el repositorio
+El navegador guarda el estado actual con la clave rumbo-trips-v1; también se siguen leyendo los datos de la versión anterior rumbo-trip-v1. El backend de Vercel escribe cada viaje como un JSON cifrado en data/trips/<id>.json. Los adjuntos se cifran por separado en data/attachments/. Cada adjunto admite hasta 1 MB y el máximo por viaje es 1,5 MB.
 
-1. Crea un repositorio en GitHub, público o privado. La cuenta del token debe tener acceso de escritura.
-2. Crea un token fine-grained limitado a ese repositorio con permiso **Contents: Read and write**.
-3. En los ajustes del proyecto de Vercel, añade estas variables para Production y Preview:
+La sincronización automática se activa después de introducir la clave una vez y guardar el viaje. Cada cambio guardado en la interfaz se escribe en GitHub después de una pausa breve. El token de GitHub se queda en el servidor y nunca se envía al navegador.
 
-   - `GITHUB_TOKEN`: el token fine-grained.
-   - `GITHUB_REPO`: `propietario/nombre-del-repositorio`.
-   - `GITHUB_SYNC_KEY`: una clave aleatoria larga (recomendado: 32 caracteres o más) que usarás en la ventana de sincronización. También cifra los JSON.
-   - `GITHUB_BRANCH`: nombre de la rama, normalmente `main` (opcional).
+## Configurar Vercel y GitHub
 
-4. Vuelve a desplegar el proyecto.
-5. En Rumbo, pulsa el icono de sincronización e introduce la misma `GITHUB_SYNC_KEY`. Desde ese momento, los siguientes cambios se guardarán automáticamente. En otro dispositivo, introduce la misma clave y pulsa **Cargar lista**.
+1. Usa un repositorio GitHub al que el token tenga permiso Contents: Read and write.
+2. En las variables de entorno del proyecto de Vercel, configura para Production y Preview:
+   - GITHUB_TOKEN: token fine-grained limitado al repositorio.
+   - GITHUB_REPO: propietario/nombre-del-repositorio.
+   - GITHUB_SYNC_KEY: una clave aleatoria larga. Protege el endpoint y cifra los JSON y adjuntos.
+   - GITHUB_BRANCH: la rama de datos, normalmente main.
+3. Vuelve a desplegar Rumbo para que la función de Vercel lea las variables.
+4. En Rumbo, abre el icono ↕, introduce la misma GITHUB_SYNC_KEY y pulsa Guardar este una vez. En otros navegadores, introduce la misma clave y usa Cargar lista.
 
-La clave adicional protege la función de servidor frente a escrituras de terceros. No es el token de GitHub; puedes generar una aleatoria con un gestor de contraseñas.
+No pegues GITHUB_TOKEN en la aplicación, en el navegador ni en GitHub. Guarda GITHUB_SYNC_KEY en un gestor de contraseñas: sin ella no se podrán descifrar las copias existentes.
 
-Guarda esta clave en un gestor de contraseñas: si se pierde, no se podrán descifrar las copias existentes.
+## Ejecutar en local
 
-## Ejecución local
+La interfaz puede abrirse con un servidor estático. Para probar también el endpoint de GitHub, instala y autentica Vercel CLI, coloca las variables en .env.local y ejecuta vercel dev desde la carpeta del proyecto. .env.local está excluido de Git. Nunca subas secretos al repositorio.
 
-La persistencia en este navegador funciona abriendo `index.html`. La sincronización con GitHub necesita el endpoint de servidor. Para probar ambas cosas en local, usa Vercel CLI y coloca las variables en `.env.local` (archivo ignorado por Git). Nunca subas `.env.local`.
+Este proyecto no tiene un paso de compilación: Vercel publica index.html, styles.css y app.js, y ejecuta api/trips.js como función Node. No necesita rewrites porque toda la interfaz vive en la ruta raíz.
 
-## Estructura
+## Verificaciones
 
-- `index.html`, `styles.css`, `app.js`: interfaz de Rumbo.
-- `api/trips.js`: API privada de lectura/escritura de archivos JSON en GitHub.
-- `data/trips/`: carpeta que GitHub crea al guardar el primer viaje.
+No hay una suite de pruebas ni dependencias de construcción en el proyecto. Comprueba la sintaxis con node --check app.js y node --check api/trips.js.
+
+## Archivos principales
+
+- index.html: estructura accesible y pestañas de la aplicación.
+- styles.css: diseño responsive de escritorio y móvil.
+- app.js: gestión de viajes, migración de datos, cálculos horarios, tiempo libre y sincronización.
+- api/trips.js: función de servidor para cifrar JSON y adjuntos y guardarlos en GitHub.
+- .env.example: nombres de variables esperadas; no contiene secretos.
