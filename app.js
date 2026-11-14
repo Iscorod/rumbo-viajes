@@ -35,6 +35,7 @@ const initialTrip = {
     notes: '',
     attachments: []
   }],
+  transfers: [],
   flights: [
     { id: 'f1', direction: 'arrival', date: '2027-06-12', departureDate: '2027-06-12', arrivalDate: '2027-06-12', from: 'Madrid (MAD)', to: 'Lisboa (LIS)', depart: '10:00', arrive: '10:45', fromTimezone: 'Europe/Madrid', toTimezone: 'Europe/Lisbon', flightNumber: 'IB 531', airportBuffer: 120, toAirportTransfer: 35, fromAirportTransfer: null, notes: '', attachments: [] },
     { id: 'f2', direction: 'departure', date: '2027-06-16', departureDate: '2027-06-16', arrivalDate: '2027-06-16', from: 'Lisboa (LIS)', to: 'Madrid (MAD)', depart: '19:30', arrive: '21:40', fromTimezone: 'Europe/Lisbon', toTimezone: 'Europe/Madrid', flightNumber: 'IB 532', airportBuffer: 120, toAirportTransfer: null, fromAirportTransfer: 35, notes: '', attachments: [] }
@@ -51,6 +52,28 @@ const timezoneByAirport = {
   DXB: 'Asia/Dubai', BKK: 'Asia/Bangkok', HND: 'Asia/Tokyo', NRT: 'Asia/Tokyo',
   SIN: 'Asia/Singapore', DEL: 'Asia/Kolkata', SYD: 'Australia/Sydney'
 };
+
+const transferLabels = { bus: 'Bus', car: 'Coche', train: 'Tren', taxi: 'Taxi', ferry: 'Ferry', metro: 'Metro', other: 'Otro' };
+
+function normalizeTransfer(transfer, index, trip) {
+  const type = Object.prototype.hasOwnProperty.call(transferLabels, transfer.type) ? transfer.type : 'other';
+  return {
+    ...transfer,
+    id: transfer.id || 'transfer-' + (index + 1) + '-' + makeId().slice(0, 7),
+    type,
+    title: transfer.title || transfer.name || '',
+    origin: transfer.origin || transfer.from || '',
+    destination: transfer.destination || transfer.to || '',
+    date: transfer.date || trip.start,
+    endDate: transfer.endDate || transfer.arrivalDate || transfer.date || trip.start,
+    start: transfer.start || transfer.depart || '12:00',
+    end: transfer.end || transfer.arrive || '13:00',
+    operator: transfer.operator || '',
+    reference: transfer.reference || '',
+    notes: transfer.notes || '',
+    attachments: Array.isArray(transfer.attachments) ? transfer.attachments : []
+  };
+}
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -143,6 +166,7 @@ function normalizeTrip(value) {
     dayEnd: raw.dayEnd || DEFAULT_USEFUL_END,
     arrivalBuffer: Number(raw.arrivalBuffer ?? 120),
     flights: [],
+    transfers: [],
     events: []
   };
   if (trip.end < trip.start) trip.end = trip.start;
@@ -163,6 +187,7 @@ function normalizeTrip(value) {
   }
   trip.hotel = raw.hotel && typeof raw.hotel === 'object' ? { ...raw.hotel } : { name: '', checkin: '15:00', checkout: '11:00', transfer: 35 };
   trip.flights = (Array.isArray(raw.flights) ? raw.flights : []).map((flight, index) => normalizeFlight(flight, index, trip));
+  trip.transfers = (Array.isArray(raw.transfers) ? raw.transfers : []).map((transfer, index) => normalizeTransfer(transfer, index, trip));
   trip.events = (Array.isArray(raw.events) ? raw.events : []).map((activity, index) => normalizeActivity(activity, index, trip));
   return trip;
 }
@@ -397,6 +422,18 @@ function allBlocks() {
     const arrivalTransfer = (flight.fromAirportTransfer !== null && flight.fromAirportTransfer !== undefined && flight.fromAirportTransfer !== '' || flight.direction === 'arrival') ? transferForFlight(flight, 'arrival') * 60000 : 0;
     if (arrivalTransfer) addBlock(blocks, times.arrival, times.arrival + arrivalTransfer, 'Traslado al hotel', formatMinutes(arrivalTransfer / 60000) + ' desde el aeropuerto', 'transfer', flight.id + '-to-hotel');
   });
+  trip.transfers.forEach(function (transfer) {
+    const start = wallTimeToEpoch(transfer.date, transfer.start, tripZone());
+    let endDate = transfer.endDate || transfer.date;
+    let end = wallTimeToEpoch(endDate, transfer.end, tripZone());
+    if (end <= start) {
+      endDate = addDays(transfer.date, 1);
+      end = wallTimeToEpoch(endDate, transfer.end, tripZone());
+    }
+    const route = [transfer.origin, transfer.destination].filter(Boolean).join(' → ');
+    const detail = [transferLabels[transfer.type] || transferLabels.other, route, transfer.operator, transfer.reference].filter(Boolean).join(' · ');
+    addBlock(blocks, start, end, transfer.title || route || transferLabels[transfer.type] || 'Traslado', detail, 'transfer', transfer.id);
+  });
   trip.hotels.forEach(function (hotel) {
     const checkinDuration = Math.max(0, Number(hotel.checkinDuration) || 0);
     if (checkinDuration) {
@@ -520,6 +557,12 @@ function getHotelsForDay(date) {
   return trip.hotels.filter(function (hotel) { return hotel.checkinDate <= date && hotel.checkoutDate >= date; });
 }
 
+function getTransfersForDay(date) {
+  return trip.transfers.filter(function (transfer) { return transfer.date <= date && (transfer.endDate || transfer.date) >= date; }).sort(function (a, b) {
+    return wallTimeToEpoch(a.date, a.start, tripZone()) - wallTimeToEpoch(b.date, b.start, tripZone());
+  });
+}
+
 function getActivitiesForDay(date) {
   return trip.events.filter(function (event) { return event.date === date; }).sort(function (a, b) {
     return wallTimeToEpoch(a.date, a.start, tripZone()) - wallTimeToEpoch(b.date, b.start, tripZone());
@@ -531,7 +574,7 @@ function setView(view) {
   document.querySelectorAll('[data-view]').forEach(function (button) { button.classList.toggle('active', button.dataset.view === view); });
   document.querySelectorAll('[data-view-panel]').forEach(function (panel) { panel.classList.toggle('active', panel.dataset.viewPanel === view); });
   const button = document.getElementById('addPrimaryBtn');
-  button.textContent = view === 'flights' ? '＋ Añadir vuelo' : view === 'hotels' ? '＋ Añadir hotel' : view === 'activities' ? '＋ Añadir actividad' : '＋ Añadir al itinerario';
+  button.textContent = view === 'flights' ? '＋ Añadir vuelo' : view === 'transfers' ? '＋ Añadir traslado' : view === 'hotels' ? '＋ Añadir hotel' : view === 'activities' ? '＋ Añadir actividad' : '＋ Añadir al itinerario';
 }
 
 function setSelectedDate(date) {
@@ -565,15 +608,17 @@ function renderDayPicker() {
   const list = document.getElementById('dayList');
   list.innerHTML = tripDays().map(function (date, index) {
     const flights = getFlightsForDay(date);
+    const transfers = getTransfersForDay(date);
     const activities = getActivitiesForDay(date);
     const hotels = getHotelsForDay(date);
     let description = 'Tiempo para descubrir';
     if (flights.length) description = flights.length + (flights.length === 1 ? ' trayecto' : ' trayectos');
+    else if (transfers.length) description = transfers.length + (transfers.length === 1 ? ' traslado' : ' traslados');
     else if (activities.length) description = activities[0].title;
     else if (hotels.length) description = hotels[0].name;
     return '<button class="day-choice ' + (date === selectedDate ? 'selected' : '') + '" data-day="' + date + '">' +
       '<span class="day-choice-index">' + String(index + 1).padStart(2, '0') + '</span><span class="day-choice-date"><strong>' + escapeHtml(formatDate(date, { weekday: 'short', day: 'numeric', month: 'short' })) + '</strong><small>' + escapeHtml(description) + '</small></span>' +
-      '<span class="day-choice-dot ' + (flights.length ? 'has-flight' : activities.length ? 'has-activity' : '') + '"></span></button>';
+      '<span class="day-choice-dot ' + (flights.length ? 'has-flight' : transfers.length ? 'has-transfer' : activities.length ? 'has-activity' : '') + '"></span></button>';
   }).join('');
 }
 
@@ -600,8 +645,9 @@ function renderSelectedDay() {
   document.getElementById('selectedDayEyebrow').textContent = (weekday + ' · ' + formatDate(selectedDate, { day: 'numeric', month: 'long' })).toLocaleUpperCase('es-ES');
   const dayActivities = getActivitiesForDay(selectedDate);
   const dayFlights = getFlightsForDay(selectedDate);
+  const dayTransfers = getTransfersForDay(selectedDate);
   const dayHotels = getHotelsForDay(selectedDate);
-  document.getElementById('selectedDayTitle').textContent = dayActivities[0]?.title || (dayFlights.length ? 'Día de viaje' : dayHotels[0]?.name || 'Un día para disfrutar');
+  document.getElementById('selectedDayTitle').textContent = dayActivities[0]?.title || (dayFlights.length ? 'Día de viaje' : dayTransfers.length ? 'Día de traslados' : dayHotels[0]?.name || 'Un día para disfrutar');
   const subtitle = dayHotels[0]?.location || trip.location || 'Tu agenda, traslados y ratos para ti en orden.';
   document.getElementById('selectedDaySub').textContent = subtitle;
   document.getElementById('selectedFreeTime').textContent = formatDurationMs(calculation.freeMilliseconds);
@@ -626,6 +672,12 @@ function renderSelectedDay() {
     return '<div class="compact-item"><span class="compact-symbol flight-symbol">✈</span><div><strong>' + escapeHtml(flight.flightNumber || (flight.from + ' → ' + flight.to)) + '</strong><span>' + escapeHtml(formatClock(times.departure) + ' · ' + flight.from + ' → ' + flight.to) + '</span></div></div>';
   }).join('');
   document.getElementById('dayFlightsEmpty').hidden = dayFlights.length > 0;
+  document.getElementById('dayTransfers').innerHTML = dayTransfers.map(function (transfer) {
+    const route = [transfer.origin, transfer.destination].filter(Boolean).join(' → ');
+    const title = transfer.title || route || transferLabels[transfer.type] || 'Traslado';
+    return '<div class="compact-item"><span class="compact-symbol transfer-symbol">' + transferIcon(transfer.type) + '</span><div><strong>' + escapeHtml(title) + '</strong><span>' + escapeHtml((transferLabels[transfer.type] || 'Traslado') + ' · ' + transfer.start + ' — ' + transfer.end) + '</span></div></div>';
+  }).join('');
+  document.getElementById('dayTransfersEmpty').hidden = dayTransfers.length > 0;
   document.getElementById('dayHotels').innerHTML = dayHotels.map(function (hotel) {
     return '<div class="compact-item"><span class="compact-symbol hotel-symbol">⌂</span><div><strong>' + escapeHtml(hotel.name) + '</strong><span>' + escapeHtml(hotel.location || 'Alojamiento') + '</span></div></div>';
   }).join('');
@@ -642,6 +694,10 @@ function categoryIcon(category) {
 
 function categoryLabel(category) {
   return { food: 'Comida', visit: 'Visita', transport: 'Transporte', show: 'Espectáculo', other: 'Otro plan' }[category] || 'Otro plan';
+}
+
+function transferIcon(type) {
+  return { bus: '▰', car: '◉', train: '▤', taxi: '◆', ferry: '◒', metro: 'Ⓜ', other: '↗' }[type] || '↗';
 }
 
 function attachmentMarkup(item, scope, id) {
@@ -677,6 +733,21 @@ function renderHotels() {
   trip.hotel = legacy ? { ...trip.hotel, name: legacy.name, checkin: legacy.checkin, checkout: legacy.checkout, transfer: legacy.airportToHotelTransfer, notes: legacy.notes, attachments: legacy.attachments } : { ...trip.hotel, name: '' };
 }
 
+function renderTransfers() {
+  const list = document.getElementById('transferList');
+  const sorted = trip.transfers.slice().sort(function (a, b) {
+    return wallTimeToEpoch(a.date, a.start, tripZone()) - wallTimeToEpoch(b.date, b.start, tripZone());
+  });
+  list.innerHTML = sorted.map(function (transfer) {
+    const route = [transfer.origin, transfer.destination].filter(Boolean).join(' → ');
+    const title = transfer.title || route || transferLabels[transfer.type] || 'Traslado';
+    const dateRange = transfer.date === (transfer.endDate || transfer.date) ? formatDate(transfer.date, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : formatRangeDate(transfer.date, transfer.endDate);
+    const details = [transfer.start + ' — ' + transfer.end, transfer.title ? route : '', transfer.operator, transfer.reference ? 'Localizador ' + transfer.reference : ''].filter(Boolean);
+    return '<article class="entity-card transfer-entity"><div class="entity-icon transfer-symbol">' + transferIcon(transfer.type) + '</div><div class="entity-main"><div class="entity-topline"><span class="entity-kicker">' + escapeHtml(transferLabels[transfer.type] || 'Traslado') + '</span><span class="entity-date">' + escapeHtml(dateRange) + '</span></div><h3>' + escapeHtml(title) + '</h3><div class="entity-details">' + details.map(function (detail) { return '<span>' + escapeHtml(detail) + '</span>'; }).join('') + '</div>' + (transfer.notes ? '<p class="entity-notes">' + escapeHtml(transfer.notes) + '</p>' : '') + attachmentMarkup(transfer, 'transfer', transfer.id) + '</div><div class="entity-actions"><button class="button button-text" data-edit-kind="transfer" data-edit-id="' + escapeHtml(transfer.id) + '">Editar</button><button class="row-remove" data-delete-kind="transfer" data-delete-id="' + escapeHtml(transfer.id) + '" aria-label="Borrar traslado">×</button></div></article>';
+  }).join('');
+  document.getElementById('transferListEmpty').hidden = trip.transfers.length > 0;
+}
+
 function renderActivities() {
   const list = document.getElementById('activitiesList');
   const conflicts = eventConflicts();
@@ -699,6 +770,7 @@ function renderSummary() {
   document.getElementById('daysStat').textContent = days.length + (days.length === 1 ? ' día' : ' días');
   document.getElementById('freeStat').textContent = formatDurationMs(freeMilliseconds);
   document.getElementById('flightsStat').textContent = trip.flights.length;
+  document.getElementById('transfersStat').textContent = trip.transfers.length;
   document.getElementById('hotelsStat').textContent = trip.hotels.length;
   const nextFlight = trip.flights.slice().sort(function (a, b) { return flightEpochs(a).departure - flightEpochs(b).departure; })[0];
   document.getElementById('nextFlightTitle').textContent = nextFlight ? nextFlight.flightNumber || nextFlight.from + ' → ' + nextFlight.to : 'Sin vuelos';
@@ -715,6 +787,7 @@ function renderAll() {
   renderDayPicker();
   renderSelectedDay();
   renderFlights();
+  renderTransfers();
   renderHotels();
   renderActivities();
   renderSummary();
@@ -744,6 +817,7 @@ function openEditor(kind, id) {
   const eyebrow = document.getElementById('modalEyebrow');
   let item = null;
   if (id && kind === 'flight') item = trip.flights.find(function (flight) { return flight.id === id; });
+  if (id && kind === 'transfer') item = trip.transfers.find(function (transfer) { return transfer.id === id; });
   if (id && kind === 'hotel') item = trip.hotels.find(function (hotel) { return hotel.id === id; });
   if (id && kind === 'event') item = trip.events.find(function (event) { return event.id === id; });
   editor.dataset.kind = kind;
@@ -798,6 +872,22 @@ function openEditor(kind, id) {
       field('Traslado al aeropuerto (min)', 'toAirportTransfer', item ? item.toAirportTransfer : '', 'number', null, false, 'En blanco: se usa el tiempo del hotel más próximo.'),
       field('Traslado desde el aeropuerto (min)', 'fromAirportTransfer', item ? item.fromAirportTransfer : '', 'number', null, false, 'En blanco: se usa el tiempo del hotel más próximo.'),
       field('Observaciones', 'notes', item ? item.notes : '', 'textarea', null, true, 'Localizador, terminal, equipaje o recordatorios.')
+    ].join('');
+  } else if (kind === 'transfer') {
+    title.textContent = item ? 'Editar traslado' : 'Añadir traslado';
+    eyebrow.textContent = 'BUS, COCHE, TREN Y MÁS';
+    fields.innerHTML = [
+      field('Tipo de transporte', 'type', item ? item.type : 'train', 'select', [['bus', 'Bus'], ['car', 'Coche'], ['train', 'Tren'], ['taxi', 'Taxi'], ['ferry', 'Ferry'], ['metro', 'Metro'], ['other', 'Otro']]),
+      field('Nombre o referencia del trayecto', 'title', item ? item.title : '', 'text'),
+      field('Origen', 'origin', item ? item.origin : '', 'text'),
+      field('Destino', 'destination', item ? item.destination : '', 'text'),
+      field('Fecha de salida', 'date', item ? item.date : selectedDate, 'date'),
+      field('Hora de salida', 'start', item ? item.start : '12:00', 'time'),
+      field('Fecha de llegada', 'endDate', item ? (item.endDate || item.date) : selectedDate, 'date'),
+      field('Hora de llegada', 'end', item ? item.end : '13:00', 'time'),
+      field('Compañía, línea o matrícula', 'operator', item ? item.operator : '', 'text'),
+      field('Localizador o número de billete', 'reference', item ? item.reference : '', 'text'),
+      field('Observaciones', 'notes', item ? item.notes : '', 'textarea', null, true, 'Punto de encuentro, equipaje o indicaciones.')
     ].join('');
   } else if (kind === 'hotel') {
     title.textContent = item ? 'Editar hotel' : 'Añadir hotel';
@@ -912,7 +1002,7 @@ function saveEditor(form) {
     trip.arrivalBuffer = Math.max(0, Number(values.arrivalBuffer) || 0);
     selectedDate = trip.start;
     if (oldRange !== trip.start + ':' + trip.end) {
-      const outside = trip.events.some(function (event) { return event.date < trip.start || event.date > trip.end; }) || trip.hotels.some(function (hotel) { return hotel.checkinDate < trip.start || hotel.checkoutDate > trip.end; });
+      const outside = trip.events.some(function (event) { return event.date < trip.start || event.date > trip.end; }) || trip.hotels.some(function (hotel) { return hotel.checkinDate < trip.start || hotel.checkoutDate > trip.end; }) || trip.transfers.some(function (transfer) { return transfer.date < trip.start || (transfer.endDate || transfer.date) > trip.end; });
       if (outside) notify('Se actualizaron los días; los datos que quedan fuera del nuevo rango se han conservado.');
     }
   } else if (kind === 'hours') {
@@ -948,6 +1038,32 @@ function saveEditor(form) {
     flight.arrivalDate = times.arrivalDate;
     if (current) trip.flights = trip.flights.map(function (item) { return item.id === id ? flight : item; });
     else trip.flights.push(flight);
+  } else if (kind === 'transfer') {
+    if (!trimValue(values.origin) || !trimValue(values.destination) || !values.date || !values.start || !values.end) return notify('Completa el origen, el destino, la fecha y las horas del traslado.');
+    const current = id ? trip.transfers.find(function (transfer) { return transfer.id === id; }) : null;
+    let endDate = values.endDate || values.date;
+    if (endDate < values.date) return notify('La fecha de llegada no puede ser anterior a la salida.');
+    if (endDate === values.date && values.end <= values.start) endDate = addDays(values.date, 1);
+    const transfer = {
+      ...(current || {}),
+      id: id || makeId(),
+      type: transferLabels[values.type] ? values.type : 'other',
+      title: trimValue(values.title),
+      origin: trimValue(values.origin),
+      destination: trimValue(values.destination),
+      date: values.date,
+      endDate: endDate,
+      start: values.start,
+      end: values.end,
+      operator: trimValue(values.operator),
+      reference: trimValue(values.reference),
+      notes: trimValue(values.notes),
+      attachments: current ? current.attachments : []
+    };
+    if (current) trip.transfers = trip.transfers.map(function (item) { return item.id === id ? transfer : item; });
+    else trip.transfers.push(transfer);
+    trip.transfers.sort(function (a, b) { return a.date.localeCompare(b.date) || a.start.localeCompare(b.start); });
+    selectedDate = transfer.date;
   } else if (kind === 'hotel') {
     if (!trimValue(values.name) || !values.checkinDate || !values.checkoutDate) return notify('Indica el nombre del hotel y las fechas de entrada y salida.');
     if (values.checkoutDate < values.checkinDate) return notify('El check-out no puede ser anterior al check-in.');
@@ -994,7 +1110,7 @@ function saveEditor(form) {
   }
   editor.close();
   saveTrip();
-  notify(kind === 'newTrip' ? 'Viaje creado.' : kind === 'trip' ? 'Viaje actualizado.' : kind === 'hours' ? 'Horario útil actualizado.' : kind === 'flight' ? 'Vuelo guardado.' : kind === 'hotel' ? 'Hotel guardado.' : 'Actividad guardada.');
+  notify(kind === 'newTrip' ? 'Viaje creado.' : kind === 'trip' ? 'Viaje actualizado.' : kind === 'hours' ? 'Horario útil actualizado.' : kind === 'flight' ? 'Vuelo guardado.' : kind === 'transfer' ? 'Traslado guardado.' : kind === 'hotel' ? 'Hotel guardado.' : 'Actividad guardada.');
 }
 
 function selectTrip(id) {
@@ -1028,9 +1144,10 @@ async function deleteTrip(id) {
 }
 
 function deleteEntity(kind, id) {
-  const type = kind === 'flight' ? 'vuelo' : kind === 'hotel' ? 'hotel' : 'actividad';
+  const type = kind === 'flight' ? 'vuelo' : kind === 'transfer' ? 'traslado' : kind === 'hotel' ? 'hotel' : 'actividad';
   if (!confirm('¿Borrar este ' + type + '?')) return;
   if (kind === 'flight') trip.flights = trip.flights.filter(function (item) { return item.id !== id; });
+  if (kind === 'transfer') trip.transfers = trip.transfers.filter(function (item) { return item.id !== id; });
   if (kind === 'hotel') {
     trip.hotels = trip.hotels.filter(function (item) { return item.id !== id; });
     syncLegacyHotel();
@@ -1083,7 +1200,7 @@ async function githubRequest(method, body, query) {
 }
 
 function allAttachmentOwners(source) {
-  return (source.hotels || []).concat(source.flights || [], source.events || []).filter(Boolean);
+  return (source.hotels || []).concat(source.flights || [], source.transfers || [], source.events || []).filter(Boolean);
 }
 
 async function syncTripToGitHub(id) {
@@ -1191,6 +1308,16 @@ function openSyncDialog() {
   syncStatus('');
 }
 
+function saveAllFromHeader() {
+  if (!syncCredential()) {
+    openSyncDialog();
+    syncStatus('Introduce la clave y pulsa «Guardar todos» para guardar tus viajes en GitHub.');
+    document.getElementById('syncKey').focus({ preventScroll: true });
+    return;
+  }
+  saveGithubTrips(trips);
+}
+
 function setEditorBackdropClose(dialog) {
   dialog.addEventListener('click', function (event) {
     if (event.target === dialog) dialog.close();
@@ -1200,6 +1327,7 @@ function setEditorBackdropClose(dialog) {
 function getAttachmentOwner(scope, ownerId) {
   if (scope === 'hotel') return trip.hotels.find(function (hotel) { return hotel.id === ownerId; });
   if (scope === 'flight') return trip.flights.find(function (flight) { return flight.id === ownerId; });
+  if (scope === 'transfer') return trip.transfers.find(function (transfer) { return transfer.id === ownerId; });
   return trip.events.find(function (event) { return event.id === ownerId; });
 }
 
@@ -1335,7 +1463,7 @@ document.getElementById('addTripMini').addEventListener('click', function () { o
 document.getElementById('editTripBtn').addEventListener('click', function () { openEditor('trip'); });
 document.getElementById('editUsefulHours').addEventListener('click', function () { openEditor('hours'); });
 document.getElementById('addPrimaryBtn').addEventListener('click', function () {
-  const kind = currentView === 'flights' ? 'flight' : currentView === 'hotels' ? 'hotel' : 'event';
+  const kind = currentView === 'flights' ? 'flight' : currentView === 'transfers' ? 'transfer' : currentView === 'hotels' ? 'hotel' : 'event';
   openEditor(kind);
 });
 document.getElementById('previousDay').addEventListener('click', function () {
@@ -1347,7 +1475,8 @@ document.getElementById('nextDay').addEventListener('click', function () {
   setSelectedDate(addDays(trip.start, index));
 });
 document.getElementById('exportBtn').addEventListener('click', exportTrip);
-document.getElementById('githubBtn').addEventListener('click', openSyncDialog);
+document.getElementById('saveAllBtn').addEventListener('click', saveAllFromHeader);
+document.getElementById('githubSettingsBtn').addEventListener('click', openSyncDialog);
 document.getElementById('closeGithub').addEventListener('click', function () { document.getElementById('githubDialog').close(); });
 document.getElementById('loadGithubTrips').addEventListener('click', loadGithubTrips);
 document.getElementById('saveGithubTrip').addEventListener('click', function () { saveGithubTrips([trip]); });

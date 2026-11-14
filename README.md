@@ -1,6 +1,6 @@
 # Rumbo
 
-Rumbo organiza viajes en una aplicación web estática, sin framework ni base de datos externa. La vista principal es un itinerario de tres columnas: selector de días, cronología y resumen del día. En móvil, el selector y las tarjetas se adaptan a una sola columna.
+Rumbo organiza viajes en una aplicación web estática, sin framework ni base de datos externa. La vista principal es un itinerario de tres columnas: selector de días, cronología y resumen del día. En móvil, el selector de viajes y los días se desplazan horizontalmente, la navegación se simplifica y las tarjetas y formularios se adaptan a pantallas pequeñas.
 
 ## Funciones
 
@@ -10,12 +10,14 @@ Rumbo organiza viajes en una aplicación web estática, sin framework ni base de
 - Guardar el número de viajeros, destino, zona horaria del destino y horario útil.
 - Añadir varios vuelos, incluidas conexiones, con origen, destino, número de vuelo, matrícula del avión, fecha y hora de cada aeropuerto y zona horaria IANA.
 - Indicar la antelación al aeropuerto en horas o minutos y los traslados por vuelo.
+- Añadir traslados independientes en bus, coche, tren, taxi, ferry o metro, con origen, destino, horario, compañía, referencia, observaciones y adjuntos.
 - Añadir varios hoteles con ubicación, fechas y horas de entrada/salida, duración de los trámites y traslados por sentido.
 - Añadir, editar y borrar actividades con horario, ubicación, categoría y descripción.
 - Señalar actividades que se solapan.
 - Calcular el tiempo libre dentro del horario útil, sin contar automáticamente la madrugada ni duplicar bloques ocupados que se superponen.
-- Adjuntar entradas y otros archivos a vuelos, hoteles y actividades.
+- Adjuntar entradas y otros archivos a vuelos, hoteles, traslados y actividades.
 - Conservar los datos en el navegador, exportar un viaje a JSON y sincronizar los cambios con GitHub.
+- Usar el botón Guardar para sincronizar todos los viajes; cada cambio individual guardado también se sincroniza automáticamente.
 
 Los cambios de las fechas de viaje generan el nuevo selector de días sin borrar los vuelos, hoteles o actividades que queden fuera del rango. Esos datos se conservan y se pueden editar desde sus secciones.
 
@@ -23,7 +25,7 @@ Los cambios de las fechas de viaje generan el nuevo selector de días sin borrar
 
 El navegador guarda el estado actual con la clave rumbo-trips-v1; también se siguen leyendo los datos de la versión anterior rumbo-trip-v1. El backend de Vercel escribe cada viaje como un JSON cifrado en data/trips/<id>.json. Los adjuntos se cifran por separado en data/attachments/. Cada adjunto admite hasta 1 MB y el máximo por viaje es 1,5 MB.
 
-La sincronización automática se activa después de introducir la clave una vez y guardar el viaje. Cada cambio guardado en la interfaz se escribe en GitHub después de una pausa breve. El token de GitHub se queda en el servidor y nunca se envía al navegador.
+La sincronización automática se activa después de introducir la clave una vez y guardar los viajes. El botón Guardar de la parte superior sincroniza todos los viajes. Cada cambio guardado en la interfaz también se escribe en GitHub después de una pausa breve. El token de GitHub se queda en el servidor y nunca se envía al navegador.
 
 ## Configurar Vercel y GitHub
 
@@ -34,7 +36,7 @@ La sincronización automática se activa después de introducir la clave una vez
    - GITHUB_SYNC_KEY: una clave aleatoria larga. Protege el endpoint y cifra los JSON y adjuntos.
    - GITHUB_BRANCH: la rama de datos, normalmente main.
 3. Vuelve a desplegar Rumbo para que la función de Vercel lea las variables.
-4. En Rumbo, abre el icono ↕, introduce la misma GITHUB_SYNC_KEY y pulsa Guardar este una vez. En otros navegadores, introduce la misma clave y usa Cargar lista.
+4. En Rumbo, pulsa Guardar, introduce la misma GITHUB_SYNC_KEY y pulsa Guardar todos una vez. Después puedes usar Guardar en la parte superior; en otros navegadores, introduce la clave y carga la lista.
 
 No pegues GITHUB_TOKEN en la aplicación, en el navegador ni en GitHub. Guarda GITHUB_SYNC_KEY en un gestor de contraseñas: sin ella no se podrán descifrar las copias existentes.
 
